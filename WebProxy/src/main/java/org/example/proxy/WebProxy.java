@@ -4,6 +4,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 
 public class WebProxy {
     private final ServerSocket serverSocket;
@@ -19,7 +20,6 @@ public class WebProxy {
             if (!serverSocket.isClosed()) {
                 clientSocket = serverSocket.accept();
 
-                System.out.println("Client has connected");
                 break;
             }
         }
@@ -28,33 +28,39 @@ public class WebProxy {
     public void run() {
         try {
             if (clientSocket != null) {
-                BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+                BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
                 OutputStream output = clientSocket.getOutputStream();
 
                 String request = input.readLine();
-                System.out.println(request);
 
-                String[] tokens = request.split(" ");
-                String method = tokens[0];
-                String url = tokens[1];
-
-                URI uri = new URI(url);
-                String scheme = uri.getScheme();
-                String host = uri.getHost();
-                int port = 80;  //HTTP port
-
-                if (!scheme.equals("http")) {
-                    System.err.println("Unsupported scheme: " + scheme);
+                if (request == null) {
+                    System.err.println("Request is null");
                     return;
                 }
 
+                String[] tokens = request.split(" ");
+                String method = tokens[0];  //GET
+                String url = tokens[1]; //http://zebroid.ida.liu.se/fakenews/test1.txt
+                String httpVersion = "HTTP/1.0";
+
+                URI uri = new URI(url);
+                String scheme = uri.getScheme(); //HTTP
+                String host = uri.getHost(); //zebroid.ida.liu.se
+                int port = 80;  //HTTP port
+
+                if (!scheme.equals("http")) {
+                    return;
+                }
+
+                System.out.println(request);
+
                 try (Socket server = new Socket(host, port)) {
                     OutputStream serverOutput = server.getOutputStream();
-                    String requestLine = method + " " + url + " HTTP/1.0\r\n\r\n";
+                    String requestLine = method + " " + url + " " + httpVersion + "\r\n\r\n";
 
                     serverOutput.write(requestLine.getBytes());
 
-                    BufferedReader serverInput = new BufferedReader(new InputStreamReader(server.getInputStream()));
+                    BufferedReader serverInput = new BufferedReader(new InputStreamReader(server.getInputStream(), StandardCharsets.UTF_8));
                     StringBuilder response = new StringBuilder();
                     String line;
 
