@@ -5,6 +5,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.Key;
+import java.util.ArrayList;
+import java.util.Arrays;
 
 public class WebProxy {
     private final ServerSocket serverSocket;
@@ -28,20 +31,20 @@ public class WebProxy {
     public void run() {
         try {
             if (clientSocket != null) {
-                InputStream input = clientSocket.getInputStream();
-                OutputStream output = clientSocket.getOutputStream();
+                InputStream clientInputStream = clientSocket.getInputStream();
+                OutputStream clientOutputStream = clientSocket.getOutputStream();
 
                 byte[] requestData = new byte[4096];
-                int bytesRead = input.read(requestData);
+                int bytesRead = clientInputStream.read(requestData);
+
                 if (bytesRead == -1) {
                     return;
                 }
 
                 String request = new String(requestData, 0, bytesRead, StandardCharsets.UTF_8);
-
                 String[] tokens = request.split(" ");
                 String method = tokens[0];  //GET
-                String url = tokens[1]; //http://zebroid.ida.liu.se/fakenews/test1.txt
+                String url = tokens[1]; //Sample url: http://zebroid.ida.liu.se/fakenews/test1.txt
                 String httpVersion = "HTTP/1.0";
 
                 URI uri = new URI(url);
@@ -49,7 +52,7 @@ public class WebProxy {
                 String host = uri.getHost(); //zebroid.ida.liu.se
                 int port = 80;  //HTTP port
 
-                if (!scheme.equals("http")) {
+                if (!scheme.equals("http") || !host.equals("zebroid.ida.liu.se")) {
                     return;
                 }
 
@@ -61,29 +64,19 @@ public class WebProxy {
 
                     serverOutput.write(requestLine.getBytes());
 
-                    InputStream serverInput = server.getInputStream();
-                    ByteArrayOutputStream response = new ByteArrayOutputStream();
+                    InputStream serverInputStream = server.getInputStream();
+                    ByteArrayOutputStream byteResponseOutputStream = new ByteArrayOutputStream();
+
                     byte[] buffer = new byte[4096];
-                    int bytesReceived;
+                    int receivedBytesCount;
 
-                    while ((bytesReceived = serverInput.read(buffer)) != -1) {
-                        response.write(buffer, 0, bytesReceived);
+                    while ((receivedBytesCount = serverInputStream.read(buffer)) != -1) {
+                        byteResponseOutputStream.write(buffer, 0, receivedBytesCount);
                     }
 
-                    String responseString = new String(response.toByteArray(), StandardCharsets.UTF_8);
-                    String[] lines = responseString.split("\r\n");
+                    byte[] modifiedResponseBytes = modifyResponse(byteResponseOutputStream.toByteArray());
 
-                    for (String line : lines) {
-                        if (line.contains(Keywords.SMILEY) && !line.contains(Keywords.IMG_TAG)) {
-                            line = line.replaceAll("\\b" + Keywords.SMILEY + "\\b", Keywords.TROLLY);
-                        }
-                        if (line.contains(Keywords.STOCKHOLM) && !line.contains(Keywords.IMG_TAG)) {
-                            line = line.replaceAll("\\b" + Keywords.STOCKHOLM + "\\b", Keywords.LINKOPING);
-                        }
-                        System.out.println(line);
-                    }
-
-                    output.write(response.toByteArray());
+                    clientOutputStream.write(modifiedResponseBytes);
                 }
 
                 clientSocket.close();
@@ -91,5 +84,38 @@ public class WebProxy {
         } catch (Exception ex) {
             ex.printStackTrace();
         }
+    }
+    public byte[] modifyResponse(byte[] originalResponse) {
+        byte[] modifiedResponse1 = replaceBytes(originalResponse, Keywords.SMILEY, Keywords.TROLLY);
+        byte[] modifiedResponse2 = replaceBytes(modifiedResponse1, Keywords.STOCKHOLM, Keywords.LINKOPING);
+        byte[] modifiedResponse3 = replaceBytes(modifiedResponse2, Keywords.SMILEY_IMG_JPG, Keywords.TROLLY_IMG_JPG);
+
+        return modifiedResponse3;
+    }
+
+    public static byte[] replaceBytes(byte[] originalBytes, byte[] pattern, byte[] replacement) {
+        int byteSequenceLength = originalBytes.length;
+
+        ArrayList<Byte> newBytes = new ArrayList<>();
+        int j = 0;
+
+        for (int i = 0; i < originalBytes.length; i++) {
+            if (i <= originalBytes.length - pattern.length && Arrays.equals(Arrays.copyOfRange(originalBytes, i, i + pattern.length), pattern)) {
+                for (byte b : replacement) {
+                    newBytes.add(b);
+                }
+                i += pattern.length - 1;
+            } else {
+                newBytes.add(originalBytes[i]);
+            }
+        }
+
+        byte[] result = new byte[newBytes.size()];
+
+        for (int i = 0; i < newBytes.size(); i++) {
+            result[i] = newBytes.get(i);
+        }
+
+        return result;
     }
 }
