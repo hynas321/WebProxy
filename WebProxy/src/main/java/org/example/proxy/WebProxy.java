@@ -89,10 +89,6 @@ public class WebProxy {
 
                     System.out.println(byteResponseOutputStream);
 
-                    for (byte b : byteResponseOutputStream.toByteArray()) {
-                        System.out.print(Integer.toHexString(b) + " ");
-                    }
-
                     clientOutputStream.write(modifiedResponseBytes, 0, responseLength);
                     clientOutputStream.flush();
                 }
@@ -144,7 +140,7 @@ public class WebProxy {
         for (int i = 0; i < newBytes.size(); i++) {
             result[i] = newBytes.get(i);
         }
-        
+
         return result;
     }
 }
