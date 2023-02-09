@@ -1,7 +1,5 @@
 package org.example.proxy;
 
-import org.example.config.Configuration;
-
 import java.net.ServerSocket;
 
 public class WebProxyMain {

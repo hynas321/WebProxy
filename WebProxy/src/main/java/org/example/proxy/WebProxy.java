@@ -28,15 +28,16 @@ public class WebProxy {
     public void run() {
         try {
             if (clientSocket != null) {
-                BufferedReader input = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
+                InputStream input = clientSocket.getInputStream();
                 OutputStream output = clientSocket.getOutputStream();
 
-                String request = input.readLine();
-
-                if (request == null) {
-                    System.err.println("Request is null");
+                byte[] requestData = new byte[4096];
+                int bytesRead = input.read(requestData);
+                if (bytesRead == -1) {
                     return;
                 }
+
+                String request = new String(requestData, 0, bytesRead, StandardCharsets.UTF_8);
 
                 String[] tokens = request.split(" ");
                 String method = tokens[0];  //GET
@@ -60,29 +61,34 @@ public class WebProxy {
 
                     serverOutput.write(requestLine.getBytes());
 
-                    BufferedReader serverInput = new BufferedReader(new InputStreamReader(server.getInputStream(), StandardCharsets.UTF_8));
-                    StringBuilder response = new StringBuilder();
-                    String line;
+                    InputStream serverInput = server.getInputStream();
+                    ByteArrayOutputStream response = new ByteArrayOutputStream();
+                    byte[] buffer = new byte[4096];
+                    int bytesReceived;
 
-                    while ((line = serverInput.readLine()) != null) {
-                        if (line.contains(Keywords.Smiley)) {
-                            line = line.replaceAll("\\b" + Keywords.Smiley + "\\b", Keywords.Trolly);
-                        }
-                        if (line.contains(Keywords.Stockholm)) {
-                            line = line.replaceAll("\\b" + Keywords.Stockholm + "\\b", Keywords.Linkoping);
-                        }
+                    while ((bytesReceived = serverInput.read(buffer)) != -1) {
+                        response.write(buffer, 0, bytesReceived);
+                    }
 
-                        response.append(line + "\r\n");
+                    String responseString = new String(response.toByteArray(), StandardCharsets.UTF_8);
+                    String[] lines = responseString.split("\r\n");
+
+                    for (String line : lines) {
+                        if (line.contains(Keywords.SMILEY) && !line.contains(Keywords.IMG_TAG)) {
+                            line = line.replaceAll("\\b" + Keywords.SMILEY + "\\b", Keywords.TROLLY);
+                        }
+                        if (line.contains(Keywords.STOCKHOLM) && !line.contains(Keywords.IMG_TAG)) {
+                            line = line.replaceAll("\\b" + Keywords.STOCKHOLM + "\\b", Keywords.LINKOPING);
+                        }
                         System.out.println(line);
                     }
 
-                    output.write(response.toString().getBytes());
+                    output.write(response.toByteArray());
                 }
 
                 clientSocket.close();
             }
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
