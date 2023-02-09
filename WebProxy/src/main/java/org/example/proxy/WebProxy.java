@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public class WebProxy {
     private final ServerSocket serverSocket;
@@ -76,6 +77,7 @@ public class WebProxy {
 
                     byte[] modifiedResponseBytes = modifyResponse(byteResponseOutputStream.toByteArray());
 
+                    System.out.println(new String(modifiedResponseBytes, StandardCharsets.UTF_8));
                     clientOutputStream.write(modifiedResponseBytes);
                 }
 
@@ -85,26 +87,28 @@ public class WebProxy {
             ex.printStackTrace();
         }
     }
-    public byte[] modifyResponse(byte[] originalResponse) {
+    private byte[] modifyResponse(byte[] originalResponse) {
         byte[] modifiedResponse1 = replaceBytes(originalResponse, Keywords.SMILEY, Keywords.TROLLY);
         byte[] modifiedResponse2 = replaceBytes(modifiedResponse1, Keywords.STOCKHOLM, Keywords.LINKOPING);
         byte[] modifiedResponse3 = replaceBytes(modifiedResponse2, Keywords.SMILEY_IMG_JPG, Keywords.TROLLY_IMG_JPG);
+        byte[] modifiedResponse4 = replaceBytes(modifiedResponse3, Keywords.LINKOPING_IMG_JPG, Keywords.STOCKHOLM_IMG_JPG);
 
-        return modifiedResponse3;
+        return modifiedResponse4;
     }
 
-    public static byte[] replaceBytes(byte[] originalBytes, byte[] pattern, byte[] replacement) {
-        int byteSequenceLength = originalBytes.length;
-
+    private static byte[] replaceBytes(byte[] originalBytes, byte[] pattern, byte[] replacement) {
         ArrayList<Byte> newBytes = new ArrayList<>();
-        int j = 0;
 
         for (int i = 0; i < originalBytes.length; i++) {
-            if (i <= originalBytes.length - pattern.length && Arrays.equals(Arrays.copyOfRange(originalBytes, i, i + pattern.length), pattern)) {
+            if (i <= originalBytes.length - pattern.length &&
+                Arrays.equals(Arrays.copyOfRange(originalBytes, i, i + pattern.length), pattern)) {
+
                 for (byte b : replacement) {
                     newBytes.add(b);
                 }
+
                 i += pattern.length - 1;
+
             } else {
                 newBytes.add(originalBytes[i]);
             }
