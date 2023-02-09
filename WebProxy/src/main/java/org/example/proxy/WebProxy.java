@@ -5,14 +5,17 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 public class WebProxy {
     private final ServerSocket serverSocket;
     private Socket clientSocket;
+    private InputStream clientInputStream;
+    private InputStream serverInputStream;
+    private OutputStream clientOutputStream;
+    private OutputStream serverOutputStream;
+    private ByteArrayOutputStream byteResponseOutputStream;
 
     public WebProxy(ServerSocket serverSocket) {
         this.serverSocket = serverSocket;
@@ -32,8 +35,8 @@ public class WebProxy {
     public void run() {
         try {
             if (clientSocket != null) {
-                InputStream clientInputStream = clientSocket.getInputStream();
-                OutputStream clientOutputStream = clientSocket.getOutputStream();
+                clientInputStream = clientSocket.getInputStream();
+                clientOutputStream = clientSocket.getOutputStream();
 
                 byte[] requestData = new byte[4096];
                 int bytesRead = clientInputStream.read(requestData);
@@ -60,13 +63,15 @@ public class WebProxy {
                 System.out.println(request);
 
                 try (Socket server = new Socket(host, port)) {
-                    OutputStream serverOutput = server.getOutputStream();
+                    serverOutputStream = server.getOutputStream();
+
                     String requestLine = method + " " + url + " " + httpVersion + "\r\n\r\n";
 
-                    serverOutput.write(requestLine.getBytes());
+                    serverOutputStream.write(requestLine.getBytes());
 
-                    InputStream serverInputStream = server.getInputStream();
-                    ByteArrayOutputStream byteResponseOutputStream = new ByteArrayOutputStream();
+                    serverInputStream = server.getInputStream();
+
+                    byteResponseOutputStream = new ByteArrayOutputStream();
 
                     byte[] buffer = new byte[4096];
                     int receivedBytesCount;
@@ -77,23 +82,43 @@ public class WebProxy {
 
                     byte[] modifiedResponseBytes = modifyResponse(byteResponseOutputStream.toByteArray());
 
-                    System.out.println(new String(modifiedResponseBytes, StandardCharsets.UTF_8));
-                    clientOutputStream.write(modifiedResponseBytes);
+                    byteResponseOutputStream.reset();
+                    byteResponseOutputStream.write(modifiedResponseBytes);
+
+                    int responseLength = byteResponseOutputStream.toByteArray().length;
+
+                    System.out.println(byteResponseOutputStream);
+
+                    for (byte b : byteResponseOutputStream.toByteArray()) {
+                        System.out.print(Integer.toHexString(b) + " ");
+                    }
+
+                    clientOutputStream.write(modifiedResponseBytes, 0, responseLength);
+                    clientOutputStream.flush();
                 }
 
-                clientSocket.close();
+                close();
             }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
     }
+
+    private void close() throws IOException {
+        clientInputStream.close();
+        serverInputStream.close();
+        clientOutputStream.close();
+        serverOutputStream.close();
+        byteResponseOutputStream.close();
+        clientSocket.close();
+    }
+
     private byte[] modifyResponse(byte[] originalResponse) {
         byte[] modifiedResponse1 = replaceBytes(originalResponse, Keywords.SMILEY, Keywords.TROLLY);
         byte[] modifiedResponse2 = replaceBytes(modifiedResponse1, Keywords.STOCKHOLM, Keywords.LINKOPING);
         byte[] modifiedResponse3 = replaceBytes(modifiedResponse2, Keywords.SMILEY_IMG_JPG, Keywords.TROLLY_IMG_JPG);
-        byte[] modifiedResponse4 = replaceBytes(modifiedResponse3, Keywords.LINKOPING_IMG_JPG, Keywords.STOCKHOLM_IMG_JPG);
 
-        return modifiedResponse4;
+        return replaceBytes(modifiedResponse3, Keywords.LINKOPING_IMG_JPG, Keywords.STOCKHOLM_IMG_JPG);
     }
 
     private static byte[] replaceBytes(byte[] originalBytes, byte[] pattern, byte[] replacement) {
@@ -119,7 +144,7 @@ public class WebProxy {
         for (int i = 0; i < newBytes.size(); i++) {
             result[i] = newBytes.get(i);
         }
-
+        
         return result;
     }
 }
